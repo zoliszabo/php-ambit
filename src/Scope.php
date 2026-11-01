@@ -16,10 +16,10 @@ final class Scope
 
     private PathMatcher $matcher;
 
-    public static function fromProject(string $directory): self
+    public static function fromProject(string $directory, string $set = 'php'): self
     {
         $file = rtrim($directory, '/\\') . '/ambit.yaml';
-        return new self((new YamlConfigLoader())->load($file));
+        return new self((new YamlConfigLoader())->load($file, $set));
     }
 
     public function __construct(Config $config)

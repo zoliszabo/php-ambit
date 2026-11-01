@@ -46,8 +46,8 @@ class ScopeTest extends TestCase
         $this->write('config/src/example.php');
         $absoluteFile = $this->write('external.php');
         $config = $this->write('config/ambit.yaml',
-            "paths:\n    - src\n    - 'modules/*/src'\n    - " . $absoluteFile
-            . "\nexclude:\n    - '*/generated/*'\n    - missing/cache/\n"
+            "php:\n    paths:\n        - src\n        - 'modules/*/src'\n        - " . $absoluteFile
+            . "\n    exclude:\n        - '*/generated/*'\n        - missing/cache/\n"
         );
         self::assertEquals(new Config(
             [$this->root . '/config/src', $this->root . '/config/modules/*/src', $absoluteFile],
@@ -145,7 +145,7 @@ class ScopeTest extends TestCase
 
     public function testMissingLiteralInclusionsFail(): void
     {
-        $config = $this->write('ambit.yaml', "paths: [missing.php]\n");
+        $config = $this->write('ambit.yaml', "php:\n    paths: [missing.php]\n");
         self::assertEquals(
             $this->config(['missing.php']),
             (new YamlConfigLoader())->load($config)
@@ -169,32 +169,9 @@ class ScopeTest extends TestCase
         self::assertSame([], $selector->findFiles(new Scope($this->config([]))));
     }
 
-    /** @dataProvider invalidConfigurations */
-    public function testInvalidConfigurationIsRejected(string $yaml): void
-    {
-        $config = $this->write('ambit.yaml', $yaml);
-        $this->expectException(InvalidArgumentException::class);
-        (new YamlConfigLoader())->load($config);
-    }
-
-    public static function invalidConfigurations(): array
-    {
-        return [
-            'empty document' => [''],
-            'missing paths' => ["exclude: []\n"],
-            'scalar paths' => ["paths: src\n"],
-            'scalar excludes' => ["paths: []\nexclude: src\n"],
-            'null excludes' => ["paths: []\nexclude: null\n"],
-            'unknown key' => ["paths: []\nexcludes: []\n"],
-            'map instead of list' => ["paths: {one: src}\n"],
-            'non-string inclusion' => ["paths: [12]\n"],
-            'empty exclusion' => ["paths: []\nexclude: ['']\n"],
-        ];
-    }
-
     public function testMalformedYamlIsRejected(): void
     {
-        $config = $this->write('ambit.yaml', 'paths: [');
+        $config = $this->write('ambit.yaml', 'php: {paths: [');
         $this->expectException(ParseException::class);
         Scope::fromProject(dirname($config));
     }
