@@ -1,10 +1,14 @@
 # Ambit
 
-Shared project file scopes and Git change selection for PHP 7.4+.
+Define which files your PHP tools should process in one place, and select files
+from those scopes or Git changes.
+
+Compatible with PHP 7.4+.
 
 ## Configuration and usage
 
-Define named sets at the top level of your project's `ambit.yaml`:
+Create an `ambit.yaml` in your project root. A single `php` set is enough;
+additional sets are optional:
 
 ```yaml
 php:
@@ -13,7 +17,18 @@ php:
         - tests
     exclude:
         - '*/generated/*'
+```
 
+```php
+use Ambit\Scope;
+
+$php = Scope::fromProject(__DIR__); // Selects the php set by default.
+```
+
+If tools need different scopes, add dedicated sets to the same file. They can inherit
+paths and exclusions from `php`:
+
+```yaml
 rector:
     extends: php
     exclude:
@@ -31,7 +46,6 @@ lint:
 ```php
 use Ambit\Scope;
 
-$php = Scope::fromProject(__DIR__); // Selects the php set.
 $rector = Scope::fromProject(__DIR__, 'rector');
 $lint = Scope::fromProject(__DIR__, 'lint');
 ```
@@ -50,7 +64,7 @@ The `lint` set includes `src`, `tests`, `bin`, and `config`, and excludes both
   `ambit.yaml`. Absolute paths remain absolute. Loading a `Config` does not check
   whether paths exist; creating a `Scope` checks literal inclusion paths in the
   selected set.
-- Omitting the set name selects `php`. If it is missing, loading fails just as
+- Omitting the set name selects `php` by default. If it is missing, loading fails just as
   it does for any other unknown set name.
 - Unknown keys, unknown set names, malformed definitions, and inheritance cycles
   are rejected. All set definitions are validated, including unused sets.
@@ -59,6 +73,22 @@ For direct configuration loading, use
 `(new Ambit\YamlConfigLoader())->load($file, 'lint')`, which returns an immutable
 `Ambit\Config` with absolute paths and exclusion patterns.
 Use `loadAll($file)` to obtain every named set with inheritance resolved.
+
+### Using Ambit with Rector
+
+In `rector.php`, use the `rector` set for paths and exclusions alongside your rule
+configuration:
+
+```php
+use Ambit\Scope;
+use Rector\Config\RectorConfig;
+
+$scope = Scope::fromProject(__DIR__, 'rector');
+
+return RectorConfig::configure()
+    ->withPaths($scope->paths())
+    ->withSkip($scope->exclusions());
+```
 
 ### Path matching
 
