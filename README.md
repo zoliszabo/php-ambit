@@ -191,3 +191,15 @@ count as matching. Directory symlinks are not traversed recursively, preventing
 cycles. An unreadable tree produces a filesystem error rather than potentially false
 unmatched-exclusion warnings. Large trees or broad external patterns can make
 filesystem validation slower.
+
+## Editor support
+
+[ambit.schema.json](ambit.schema.json) provides JSON Schema validation and
+completion for YAML editors. Run `ambit validate` for inheritance and filesystem
+checks.
+
+Add this hint on the first line of your project-root `ambit.yaml`:
+
+```yaml
+# yaml-language-server: $schema=vendor/zoliszabo/php-ambit/ambit.schema.json
+```

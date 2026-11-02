@@ -1,0 +1,61 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://raw.githubusercontent.com/zoliszabo/php-ambit/main/ambit.schema.json",
+    "title": "Ambit configuration",
+    "description": "Named file scopes for Ambit. Relative paths are resolved from the directory containing ambit.yaml. Parent references, inheritance cycles, empty leaf scopes, and filesystem matches are checked by ambit validate.",
+    "type": "object",
+    "minProperties": 1,
+    "propertyNames": {
+        "minLength": 1
+    },
+    "additionalProperties": {
+        "$ref": "#/definitions/set"
+    },
+    "definitions": {
+        "set": {
+            "title": "File scope",
+            "description": "Paths and exclusions are additive across parents. All properties are optional; empty lists keep inherited entries.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "paths": {
+                    "description": "Included files, directories, or glob patterns. Patterns containing * use PHP glob(); ** is not recursive.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/nonEmptyString"
+                    },
+                    "default": [],
+                    "examples": [["src", "tests", "modules/*/src"]]
+                },
+                "exclude": {
+                    "description": "Excluded paths or patterns using Rector-style prefix/suffix and fnmatch() matching. A trailing / prevents literal directory exclusions from matching siblings with the same prefix.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/nonEmptyString"
+                    },
+                    "default": [],
+                    "examples": [["*/generated/*", "tests/Fixtures/"]]
+                },
+                "extends": {
+                    "description": "Parent set name or list of parent names. Inherited paths and exclusions are merged in declaration order before this set's entries.",
+                    "oneOf": [
+                        {
+                            "$ref": "#/definitions/nonEmptyString"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/nonEmptyString"
+                            }
+                        }
+                    ],
+                    "examples": ["php", ["php", "shared"]]
+                }
+            }
+        },
+        "nonEmptyString": {
+            "type": "string",
+            "minLength": 1
+        }
+    }
+}
