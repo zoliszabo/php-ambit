@@ -58,6 +58,7 @@ foreach ($arguments as $argument) {
 }
 
 $file = $file ?? 'ambit.yaml';
+fwrite(STDOUT, 'Validating "' . $file . '".' . "\n");
 $result = (new Validate())->validateFile(
     $file,
     $set,

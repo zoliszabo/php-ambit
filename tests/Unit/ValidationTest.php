@@ -265,10 +265,12 @@ YAML
         [$status, $output, $error] = $this->cli(['validate']);
         self::assertSame(3, $status);
         self::assertSame('', $error);
+        self::assertStringStartsWith("Validating \"ambit.yaml\".\n", $output);
         self::assertStringContainsString('WARNING [filesystem] lint.paths', $output);
         self::assertStringContainsString('0 error(s), 2 warning(s).', $output);
         [$status, $output] = $this->cli(['validate', '--schema-only']);
         self::assertSame(0, $status);
+        self::assertStringStartsWith("Validating \"ambit.yaml\".\n", $output);
         self::assertStringContainsString('0 error(s), 0 warning(s).', $output);
     }
 
@@ -277,6 +279,7 @@ YAML
         $file = $this->write('config/ambit.yaml', "php: {paths: [missing], exclude: [absent]}\nlint: {}\n");
         [$status, $output] = $this->cli(['validate', $file, '--set=lint']);
         self::assertSame(0, $status);
+        self::assertStringStartsWith('Validating "' . $file . '".' . "\n", $output);
         self::assertStringContainsString('0 warning(s)', $output);
         foreach (['--paths-only' => 'paths', '--exclusions-only' => 'exclude'] as $option => $key) {
             [$status, $output] = $this->cli(['validate', $file, '--set=php', $option]);
@@ -292,6 +295,7 @@ YAML
         $this->write('ambit.yaml', "php: {extends: missing}\n");
         [$status, $output] = $this->cli(['validate']);
         self::assertSame(1, $status);
+        self::assertStringStartsWith("Validating \"ambit.yaml\".\n", $output);
         self::assertStringContainsString('ERROR [schema]', $output);
         self::assertStringContainsString('1 error(s), 0 warning(s)', $output);
         self::assertSame(2, $this->cli(['validate', '--unknown'])[0]);
