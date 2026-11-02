@@ -11,6 +11,15 @@ use Symfony\Component\Yaml\Yaml;
 
 final class YamlConfigLoader
 {
+    /** @var array<string, array<string, array<string, string>>> */
+    private array $originalEntries = [];
+
+    /** Original entry from the most recently loaded file, including inheritance. */
+    public function originalEntry(string $set, string $key, string $path): ?string
+    {
+        return $this->originalEntries[$set][$key][$path] ?? null;
+    }
+
     public function load(string $file, string $set = 'php'): Config
     {
         $configs = $this->loadAll($file);
@@ -23,6 +32,7 @@ final class YamlConfigLoader
     /** @return array<string, Config> All sets, with inheritance resolved. */
     public function loadAll(string $file): array
     {
+        $this->originalEntries = [];
         // Parsing must succeed before the schema validator receives any data.
         $data = Yaml::parseFile($file);
         (new SchemaValidator())->assertValid($data);
@@ -38,9 +48,12 @@ final class YamlConfigLoader
         foreach ($data as $name => $definition) {
             $inherited = $definition['extends'] ?? [];
             $parents[$name] = is_string($inherited) ? [$inherited] : $inherited;
+            $paths = $this->resolveEntries($definition['paths'] ?? [], $directory);
+            $exclusions = $this->resolveEntries($definition['exclude'] ?? [], $directory);
+            $this->originalEntries[$name] = ['paths' => $paths, 'exclude' => $exclusions];
             $configs[$name] = new Config(
-                $this->resolvePaths($definition['paths'] ?? [], $directory),
-                $this->resolvePaths($definition['exclude'] ?? [], $directory)
+                array_keys($paths),
+                array_keys($exclusions)
             );
         }
 
@@ -63,11 +76,17 @@ final class YamlConfigLoader
         }
         $paths = [];
         $exclusions = [];
+        $originals = ['paths' => [], 'exclude' => []];
         foreach ($parents[$name] as $parent) {
             $inherited = $this->resolveSet($parent, $configs, $parents, $resolved);
             $paths = array_merge($paths, $inherited->paths());
             $exclusions = array_merge($exclusions, $inherited->exclusions());
+            $originals['paths'] += $this->originalEntries[$parent]['paths'];
+            $originals['exclude'] += $this->originalEntries[$parent]['exclude'];
         }
+        $originals['paths'] += $this->originalEntries[$name]['paths'];
+        $originals['exclude'] += $this->originalEntries[$name]['exclude'];
+        $this->originalEntries[$name] = $originals;
         return $resolved[$name] = new Config(
             array_merge($paths, $configs[$name]->paths()),
             array_merge($exclusions, $configs[$name]->exclusions())
@@ -76,16 +95,20 @@ final class YamlConfigLoader
 
     /**
      * @param string[] $paths
-     * @return string[]
+     * @return array<string, string> Resolved paths mapped to their first original entry.
      */
-    private function resolvePaths(array $paths, string $directory): array
+    private function resolveEntries(array $paths, string $directory): array
     {
         $resolved = [];
         foreach ($paths as $path) {
+            $original = $path;
             $path = str_replace('\\', '/', $path);
-            $resolved[] = preg_match('~^(?:/|[a-zA-Z]:/)~', $path)
+            $absolute = preg_match('~^(?:/|[a-zA-Z]:/)~', $path)
                 ? $path
                 : rtrim($directory, '/') . '/' . $path;
+            if (!isset($resolved[$absolute])) {
+                $resolved[$absolute] = $original;
+            }
         }
         return $resolved;
     }

@@ -71,6 +71,13 @@ foreach ($result->issues() as $issue) {
         $context .= '.' . $issue->key();
     }
     $path = $issue->path() === null ? '' : ' "' . $issue->path() . '":';
+    if ($issue->originalEntry() !== null) {
+        $path = ' "' . $issue->originalEntry() . '"';
+        if ($issue->originalEntry() !== $issue->path()) {
+            $path .= ' (resolved to "' . $issue->path() . '")';
+        }
+        $path .= ':';
+    }
     fwrite(STDOUT, strtoupper($issue->severity()) . ' [' . $issue->type() . ']' . $context . $path . ' ' . $issue->message() . "\n");
 }
 fwrite(STDOUT, sprintf("%d error(s), %d warning(s).\n", count($result->errors()), count($result->warnings())));

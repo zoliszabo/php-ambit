@@ -143,8 +143,11 @@ YAML
         self::assertSame('php', $issue->set());
         self::assertSame('paths', $issue->key());
         self::assertSame($this->root . '/project/missing.php', $issue->path());
+        self::assertSame('missing.php', $issue->originalEntry());
         self::assertSame('lint', $result->warnings()[4]->set());
+        self::assertSame('missing.php', $result->warnings()[4]->originalEntry());
         self::assertSame('exclude', $result->warnings()[7]->key());
+        self::assertSame('*/generated/*', $result->warnings()[7]->originalEntry());
     }
 
     public function testFilesystemCanBeLimitedToOneSetAndOneKindOfPath(): void
@@ -227,6 +230,7 @@ YAML
         $result = (new FilesystemValidator())->validate($config, $this->root);
         self::assertCount(2, $result->warnings());
         self::assertNull($result->warnings()[0]->set());
+        self::assertNull($result->warnings()[0]->originalEntry());
         $result = (new FilesystemValidator())->validate($config, $this->root . '/absent');
         self::assertFalse($result->isValid());
         self::assertSame('filesystem', $result->errors()[0]->type());
@@ -288,6 +292,57 @@ YAML
             self::assertStringContainsString($this->root . '/config/', $output);
             self::assertStringContainsString('1 warning(s)', $output);
         }
+    }
+
+    public function testCliPreservesOriginalEntriesThroughInheritanceAndNormalization(): void
+    {
+        $absolute = $this->root . '/config/missing.php';
+        $file = $this->write('config/ambit.yaml', <<<'YAML'
+base:
+    paths: [missing.php, 'missing\file.php', 'modules/*/src', ./missing.php]
+    exclude: ['../cache/']
+php:
+    extends: base
+YAML
+            . "\n    paths: ['" . $absolute . "']\nabsolute:\n    paths: ['" . $absolute . "']\n"
+        );
+        [$status, $output, $error] = $this->cli(['validate', $file, '--set=php']);
+        self::assertSame(3, $status);
+        self::assertSame('', $error);
+        foreach ([
+            ['paths', 'missing.php', 'missing.php'],
+            ['paths', 'missing\\file.php', 'missing/file.php'],
+            ['paths', 'modules/*/src', 'modules/*/src'],
+            ['paths', './missing.php', './missing.php'],
+            ['exclude', '../cache/', '../cache/'],
+        ] as [$key, $original, $resolved]) {
+            self::assertStringContainsString(
+                'WARNING [filesystem] php.' . $key . ' "' . $original . '" (resolved to "'
+                . $this->root . '/config/' . $resolved . '"): This does not match any real path.',
+                $output
+            );
+        }
+        self::assertStringContainsString('0 error(s), 5 warning(s).', $output);
+
+        [$status, $output] = $this->cli(['validate', $file, '--set=absolute']);
+        self::assertSame(3, $status);
+        self::assertStringContainsString(
+            'WARNING [filesystem] absolute.paths "' . $absolute . '": This does not match any real path.',
+            $output
+        );
+        self::assertStringNotContainsString('resolved to', $output);
+    }
+
+    public function testLoaderOriginalEntriesBelongToTheMostRecentlyLoadedFile(): void
+    {
+        $loader = new YamlConfigLoader();
+        $file = $this->write('ambit.yaml', "php: {paths: [missing.php]}\n");
+        $loader->loadAll($file);
+        self::assertSame('missing.php', $loader->originalEntry('php', 'paths', $this->root . '/missing.php'));
+
+        $other = $this->write('other.yaml', "php: {}\n");
+        $loader->loadAll($other);
+        self::assertNull($loader->originalEntry('php', 'paths', $this->root . '/missing.php'));
     }
 
     public function testCliSchemaFailuresUsageErrorsAndHelp(): void

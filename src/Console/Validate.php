@@ -50,7 +50,10 @@ final class Validate
                     $issue->message(),
                     $name,
                     $issue->key(),
-                    $issue->path()
+                    $issue->path(),
+                    $issue->key() !== null && $issue->path() !== null
+                        ? $loader->originalEntry($name, $issue->key(), $issue->path())
+                        : null
                 );
             }
         }

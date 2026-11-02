@@ -135,8 +135,8 @@ Example output:
 
 ```text
 Validating "ambit.yaml".
-WARNING [filesystem] php.paths "/project/modules/*/src": This does not match any real path.
-WARNING [filesystem] php.exclude "/project/cache/": This does not match any real path.
+WARNING [filesystem] php.paths "modules/*/src" (resolved to "/project/modules/*/src"): This does not match any real path.
+WARNING [filesystem] php.exclude "cache/" (resolved to "/project/cache/"): This does not match any real path.
 0 error(s), 2 warning(s).
 ```
 

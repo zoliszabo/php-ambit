@@ -12,6 +12,7 @@ final class Issue
     private ?string $set;
     private ?string $key;
     private ?string $path;
+    private ?string $originalEntry;
 
     public function __construct(
         string $severity,
@@ -19,7 +20,8 @@ final class Issue
         string $message,
         ?string $set = null,
         ?string $key = null,
-        ?string $path = null
+        ?string $path = null,
+        ?string $originalEntry = null
     ) {
         $this->severity = $severity;
         $this->type = $type;
@@ -27,6 +29,7 @@ final class Issue
         $this->set = $set;
         $this->key = $key;
         $this->path = $path;
+        $this->originalEntry = $originalEntry;
     }
 
     public function severity(): string
@@ -57,5 +60,10 @@ final class Issue
     public function path(): ?string
     {
         return $this->path;
+    }
+
+    public function originalEntry(): ?string
+    {
+        return $this->originalEntry;
     }
 }
