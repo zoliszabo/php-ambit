@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ambit\Tests\Unit;
 
 use Ambit\Config;
+use Ambit\Exception\UnknownSetException;
 use Ambit\FileSelector;
 use Ambit\Scope;
 use Ambit\YamlConfigLoader;
@@ -171,9 +172,9 @@ YAML
     public function testUnknownSelectedSetIsRejected(): void
     {
         $file = $this->write('ambit.yaml', "php: {}\n");
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(UnknownSetException::class);
         $this->expectExceptionMessage('Unknown scope set "lint"');
-        Scope::fromProject(dirname($file), 'lint');
+        (new YamlConfigLoader())->load($file, 'lint');
     }
 
     /** @dataProvider invalidNamedConfigurations */
@@ -190,7 +191,7 @@ YAML
         return [
             'empty document' => ['', 'must be a mapping of named sets'],
             'scalar document' => ["src\n", 'must be a mapping of named sets'],
-            'empty mapping' => ["{}\n", 'Unknown scope set "php"'],
+            'empty mapping' => ["{}\n", 'at least one named set'],
             'list of sets' => ["[{}]\n", 'must map non-empty string names'],
             'empty name' => ["'': {}\n", 'must map non-empty string names'],
             'scalar definition' => ["php: src\n", 'must map non-empty string names'],

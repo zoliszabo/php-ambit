@@ -1,0 +1,79 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Ambit\Console\Validate;
+
+$autoload = $_composer_autoload_path ?? __DIR__ . '/../vendor/autoload.php';
+if (!is_file($autoload)) {
+    $autoload = __DIR__ . '/../../../autoload.php';
+}
+if (!is_file($autoload)) {
+    fwrite(STDERR, "Composer autoloader not found. Install dependencies before running ambit.\n");
+    exit(2);
+}
+require $autoload;
+
+$help = <<<'HELP'
+Usage: ambit validate [ambit.yaml] [options]
+
+Validate configuration structure and check whether paths match real files or directories.
+The file defaults to ./ambit.yaml. All sets are checked unless --set is given.
+
+Options:
+  --set=NAME          Check the filesystem for one set (schema checks still cover all sets).
+  --schema-only       Parse YAML and validate the schema without filesystem checks.
+  --paths-only        Validate schema and check inclusions only.
+  --exclusions-only   Validate schema and check exclusions only.
+  -h, --help          Show this help.
+
+Exit status: 0 = no issues; 1 = validation errors; 2 = usage error; 3 = warnings only.
+HELP;
+
+$arguments = array_slice($argv, 1);
+if ($arguments === [] || in_array('--help', $arguments, true) || in_array('-h', $arguments, true)) {
+    fwrite(STDOUT, $help . "\n");
+    exit(0);
+}
+if (array_shift($arguments) !== 'validate') {
+    fwrite(STDERR, "Unknown command.\n" . $help . "\n");
+    exit(2);
+}
+
+$file = null;
+$set = null;
+$mode = null;
+foreach ($arguments as $argument) {
+    if (strpos($argument, '--set=') === 0 && substr($argument, 6) !== '') {
+        $set = substr($argument, 6);
+    } elseif (in_array($argument, ['--schema-only', '--paths-only', '--exclusions-only'], true) && $mode === null) {
+        $mode = $argument;
+    } elseif (strpos($argument, '-') !== 0 && $file === null) {
+        $file = $argument;
+    } else {
+        fwrite(STDERR, 'Invalid or conflicting argument: ' . $argument . "\n" . $help . "\n");
+        exit(2);
+    }
+}
+
+$file = $file ?? 'ambit.yaml';
+$result = (new Validate())->validateFile(
+    $file,
+    $set,
+    $mode !== '--schema-only' && $mode !== '--exclusions-only',
+    $mode !== '--schema-only' && $mode !== '--paths-only'
+);
+foreach ($result->issues() as $issue) {
+    $context = $issue->set() === null ? '' : ' ' . $issue->set();
+    if ($issue->key() !== null) {
+        $context .= '.' . $issue->key();
+    }
+    $path = $issue->path() === null ? '' : ' "' . $issue->path() . '":';
+    fwrite(STDOUT, strtoupper($issue->severity()) . ' [' . $issue->type() . ']' . $context . $path . ' ' . $issue->message() . "\n");
+}
+fwrite(STDOUT, sprintf("%d error(s), %d warning(s).\n", count($result->errors()), count($result->warnings())));
+if (!$result->isValid()) {
+    exit(1);
+}
+exit($result->warnings() === [] ? 0 : 3);

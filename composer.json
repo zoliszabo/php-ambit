@@ -3,6 +3,7 @@
     "description": "Ambit: shared project file scopes and Git change selection.",
     "license": "proprietary",
     "type": "library",
+    "bin": ["bin/ambit"],
     "require": {
         "php": ">=7.4",
         "symfony/process": "^5.4",
