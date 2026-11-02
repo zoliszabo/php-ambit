@@ -14,6 +14,18 @@ final class YamlConfigLoader
     /** @var array<string, array<string, array<string, string>>> */
     private array $originalEntries = [];
 
+    /** @var string[] */
+    private array $leafSets = [];
+
+    /**
+     * Sets that no other set extends, from the most recently loaded file.
+     * @return string[]
+     */
+    public function leafSets(): array
+    {
+        return $this->leafSets;
+    }
+
     /** Original entry from the most recently loaded file, including inheritance. */
     public function originalEntry(string $set, string $key, string $path): ?string
     {
@@ -33,6 +45,7 @@ final class YamlConfigLoader
     public function loadAll(string $file): array
     {
         $this->originalEntries = [];
+        $this->leafSets = [];
         // Parsing must succeed before the schema validator receives any data.
         $data = Yaml::parseFile($file);
         (new SchemaValidator())->assertValid($data);
@@ -45,9 +58,13 @@ final class YamlConfigLoader
 
         $configs = [];
         $parents = [];
+        $extended = [];
         foreach ($data as $name => $definition) {
             $inherited = $definition['extends'] ?? [];
             $parents[$name] = is_string($inherited) ? [$inherited] : $inherited;
+            foreach ($parents[$name] as $parent) {
+                $extended[$parent] = true;
+            }
             $paths = $this->resolveEntries($definition['paths'] ?? [], $directory);
             $exclusions = $this->resolveEntries($definition['exclude'] ?? [], $directory);
             $this->originalEntries[$name] = ['paths' => $paths, 'exclude' => $exclusions];
@@ -61,6 +78,7 @@ final class YamlConfigLoader
         foreach (array_keys($configs) as $name) {
             $this->resolveSet($name, $configs, $parents, $resolved);
         }
+        $this->leafSets = array_values(array_diff(array_keys($configs), array_keys($extended)));
         return $resolved;
     }
 

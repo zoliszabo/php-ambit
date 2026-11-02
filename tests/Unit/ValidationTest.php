@@ -162,6 +162,57 @@ YAML
         self::assertSame('exclude', $exclusions->warnings()[0]->key());
     }
 
+    public function testEmptyPathsWarnOnlyForLeafSetsAfterInheritance(): void
+    {
+        $file = $this->write('ambit.yaml', <<<'YAML'
+inherited:
+    extends: [middle, shared]
+    paths: []
+omitted: {}
+explicit:
+    paths: []
+middle:
+    extends: base
+base: {}
+shared:
+    exclude: [.]
+source:
+    paths: [.]
+populated:
+    extends: [base, source]
+    paths: []
+YAML
+        );
+        $validator = new Validate();
+        $result = $validator->validateFile($file);
+        self::assertTrue($result->isValid());
+        self::assertSame([], $result->errors());
+        self::assertSame(['inherited', 'omitted', 'explicit'], array_map(static function ($issue): ?string {
+            return $issue->set();
+        }, $result->warnings()));
+        foreach ($result->warnings() as $issue) {
+            self::assertSame('filesystem', $issue->type());
+            self::assertSame('paths', $issue->key());
+            self::assertNull($issue->path());
+            self::assertNull($issue->originalEntry());
+            self::assertStringContainsString('no inclusion paths after inheritance', $issue->message());
+        }
+        // Selecting a parent does not turn it into a leaf of the full configuration.
+        self::assertSame([], $validator->validateFile($file, 'base')->issues());
+        self::assertSame([], $validator->validateFile($file, 'populated')->issues());
+        self::assertCount(1, $validator->validateFile($file, 'inherited')->warnings());
+    }
+
+    public function testEmptyLeafWarningFollowsInclusionCheckOptions(): void
+    {
+        $file = $this->write('ambit.yaml', "php: {}\n");
+        $validator = new Validate();
+        self::assertCount(1, $validator->validateFile($file, null, true, false)->warnings());
+        self::assertSame([], $validator->validateFile($file, null, false, true)->issues());
+        self::assertSame([], $validator->validateFile($file, null, false, false)->issues());
+        self::assertSame([], (new YamlConfigLoader())->load($file)->paths());
+    }
+
     public function testInclusionChecksUseGlobWithoutRecursiveGlobstarOrQuestionMarkOnly(): void
     {
         $this->write('modules/one/nested/src/code.php');
@@ -198,7 +249,7 @@ php:
         - empty/
 YAML
         );
-        $result = (new Validate())->validateFile($file);
+        $result = (new Validate())->validateFile($file, null, false, true);
         self::assertCount(1, $result->warnings());
         self::assertSame($this->root . '/src/cache/', $result->warnings()[0]->path());
     }
@@ -241,7 +292,7 @@ YAML
         $this->write('src/code.php');
         symlink($this->root, $this->root . '/src/loop');
         $file = $this->write('ambit.yaml', "php: {exclude: ['*/absent/*']}\n");
-        self::assertCount(1, (new Validate())->validateFile($file)->warnings());
+        self::assertCount(1, (new Validate())->validateFile($file, null, false, true)->warnings());
     }
 
     public function testUnreadableDirectoriesProduceErrorsWithoutFalseUnmatchedWarnings(): void
@@ -253,7 +304,7 @@ YAML
         $file = $this->write('ambit.yaml', "php: {exclude: ['*/absent/*']}\n");
         chmod($this->root . '/private', 0000);
         try {
-            $result = (new Validate())->validateFile($file);
+            $result = (new Validate())->validateFile($file, null, false, true);
             self::assertFalse($result->isValid());
             self::assertCount(1, $result->errors());
             self::assertSame('filesystem', $result->errors()[0]->type());
@@ -282,9 +333,11 @@ YAML
     {
         $file = $this->write('config/ambit.yaml', "php: {paths: [missing], exclude: [absent]}\nlint: {}\n");
         [$status, $output] = $this->cli(['validate', $file, '--set=lint']);
-        self::assertSame(0, $status);
+        self::assertSame(3, $status);
         self::assertStringStartsWith('Validating "' . $file . '".' . "\n", $output);
-        self::assertStringContainsString('0 warning(s)', $output);
+        self::assertStringContainsString('WARNING [filesystem] lint.paths', $output);
+        self::assertStringContainsString('will select no files', $output);
+        self::assertStringContainsString('1 warning(s)', $output);
         foreach (['--paths-only' => 'paths', '--exclusions-only' => 'exclude'] as $option => $key) {
             [$status, $output] = $this->cli(['validate', $file, '--set=php', $option]);
             self::assertSame(3, $status);
@@ -392,7 +445,7 @@ YAML
 
     public function testInstalledBinaryCanFindTheConsumingProjectsAutoloader(): void
     {
-        $this->write('ambit.yaml', "php: {}\n");
+        $this->write('ambit.yaml', "php: {paths: [.]}\n");
         $binary = $this->write('installed/vendor/zoliszabo/php-ambit/bin/ambit',
             file_get_contents(dirname(__DIR__, 2) . '/bin/ambit')
         );

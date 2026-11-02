@@ -42,6 +42,15 @@ final class Validate
         $validator = new FilesystemValidator();
         $directory = str_replace('\\', '/', (string) realpath(dirname($file)));
         foreach ($configs as $name => $config) {
+            if ($checkInclusions && $config->paths() === [] && in_array($name, $loader->leafSets(), true)) {
+                $issues[] = new Issue(
+                    'warning',
+                    'filesystem',
+                    'This leaf set has no inclusion paths after inheritance and will select no files.',
+                    $name,
+                    'paths'
+                );
+            }
             $result = $validator->validate($config, $directory, $checkInclusions, $checkExclusions);
             foreach ($result->issues() as $issue) {
                 $issues[] = new Issue(

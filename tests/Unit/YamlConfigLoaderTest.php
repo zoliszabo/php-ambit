@@ -143,6 +143,18 @@ YAML
         self::assertEquals(new Config([]), (new YamlConfigLoader())->load($file));
     }
 
+    public function testLeafSetsBelongToTheMostRecentlyLoadedFile(): void
+    {
+        $loader = new YamlConfigLoader();
+        self::assertSame([], $loader->leafSets());
+        $file = $this->write('ambit.yaml', "leaf: {extends: [base, shared]}\nbase: {}\nshared: {}\nother: {}\n");
+        $loader->loadAll($file);
+        self::assertSame(['leaf', 'other'], $loader->leafSets());
+
+        $loader->loadAll($this->write('other.yaml', "php: {}\n"));
+        self::assertSame(['php'], $loader->leafSets());
+    }
+
     public function testPhpSetIsSelectedByDefaultRegardlessOfDeclarationOrder(): void
     {
         $this->write('src/example.php');

@@ -106,7 +106,9 @@ Ambit provides two types of validation:
   without reading files or requiring configured paths to exist.
 - **Filesystem** validation checks whether inclusions and exclusions match existing
   files or directories. Each unmatched entry produces a warning, including missing
-  literal inclusions.
+  literal inclusions. Inclusion checks also warn when a leaf set (one that no other
+  set extends) has no paths after inheritance and therefore selects no files.
+  Empty parent sets can serve as shared exclusion definitions without this warning.
 
 `YamlConfigLoader` parses YAML, validates its schema, and resolves paths and
 inheritance into `Config` objects. Invalid YAML raises
